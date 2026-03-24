@@ -27,6 +27,10 @@ npm install
 npm run dev
 ```
 
+**Прокси API:** запросы с браузера идут на **`/api-proxy`**; их обрабатывает [`frontend/src/app/api-proxy/[...path]/route.ts`](frontend/src/app/api-proxy/%5B...path%5D/route.ts) и пересылает на бэкенд (`BACKEND_INTERNAL_URL` или по умолчанию `http://127.0.0.1:4000`). Так обходятся CORS и баг Next.js 16 с **POST** через `rewrites` в `next.config`. Статику загрузок отдаёт rewrite **`/uploads-proxy`** → `/uploads` на API.
+
+Не задавайте в `.env.local` абсолютный **`NEXT_PUBLIC_API_URL`**, если не нужен отдельный домен API (тогда используется прокси).
+
 Откройте `http://localhost:3000`. Тестовые учётки после сида:
 
 - `admin@armflow.local` / `admin123`
@@ -35,19 +39,29 @@ npm run dev
 
 ## Docker
 
-При установленном Docker:
-
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
-Поднимутся Postgres, API (порт 4000) и веб (порт 3000). Перед первым запуском контейнера API применит миграции; для сида выполните один раз вручную, например:
+Сервисы: Postgres, **api** (4000), **web** (3000). У **web** задано `BACKEND_INTERNAL_URL=http://api:4000` — прокси из контейнера Next к контейнеру API. При старте **api** выполняется `prisma migrate deploy`, затем приложение (`node dist/src/main.js`).
+
+Сид (один раз после первого подъёма):
 
 ```bash
 docker compose exec api npx prisma db seed
 ```
 
-Если Docker недоступен, используйте локальный сценарий выше.
+Остановить и **удалить контейнеры** (тома БД и uploads сохраняются):
+
+```bash
+docker compose down
+```
+
+Удалить и тома (`pgdata`, `uploads`):
+
+```bash
+docker compose down -v
+```
 
 ## Роли
 

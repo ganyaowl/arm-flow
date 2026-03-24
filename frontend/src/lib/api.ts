@@ -1,6 +1,18 @@
 import type { Exercise, Role, StudentRow, UserMe, Workout } from './types';
 
-const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
+/**
+ * Если задан абсолютный NEXT_PUBLIC_API_URL — запросы идут напрямую.
+ * Иначе — через прокси Next.js (/api-proxy → бэкенд), чтобы не ловить CORS и «localhost» с другого хоста.
+ */
+function resolveApiBase(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL?.trim() ?? '';
+  if (/^https?:\/\//i.test(raw)) {
+    return raw.replace(/\/$/, '');
+  }
+  return '/api-proxy';
+}
+
+const base = resolveApiBase();
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -11,6 +23,12 @@ export function setToken(token: string | null) {
   if (typeof window === 'undefined') return;
   if (token) localStorage.setItem('armflow_token', token);
   else localStorage.removeItem('armflow_token');
+}
+
+function networkError(): Error {
+  return new Error(
+    'Сервер API недоступен. Запустите бэкенд: в папке backend — «npm run start:dev» (порт 4000), с поднятой PostgreSQL. Либо «docker compose up».',
+  );
 }
 
 async function request<T>(
@@ -24,7 +42,12 @@ async function request<T>(
     headers.set('Content-Type', 'application/json');
   }
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  const res = await fetch(`${base}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, { ...init, headers });
+  } catch {
+    throw networkError();
+  }
   if (!res.ok) {
     let msg = res.statusText;
     try {
@@ -143,11 +166,16 @@ export const api = {
     fd.append('file', file);
     const headers = new Headers();
     if (token) headers.set('Authorization', `Bearer ${token}`);
-    const res = await fetch(`${base}/upload/exercises/${exerciseId}/video`, {
-      method: 'POST',
-      headers,
-      body: fd,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${base}/upload/exercises/${exerciseId}/video`, {
+        method: 'POST',
+        headers,
+        body: fd,
+      });
+    } catch {
+      throw networkError();
+    }
     if (!res.ok) {
       const t = await res.text();
       throw new Error(t || res.statusText);
@@ -158,7 +186,11 @@ export const api = {
 
 export function mediaUrl(pathOrName: string | null | undefined): string | null {
   if (!pathOrName) return null;
-  const origin = base.replace(/\/api\/?$/, '');
   if (pathOrName.startsWith('http')) return pathOrName;
-  return `${origin}/uploads/${pathOrName.replace(/^\//, '')}`;
+  const p = pathOrName.replace(/^\//, '');
+  if (base.startsWith('http')) {
+    const origin = base.replace(/\/api\/?$/, '');
+    return `${origin}/uploads/${p}`;
+  }
+  return `/uploads-proxy/${p}`;
 }
