@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  COACH
+  STUDENT
+}
+
+enum WeightUnit {
+  KG
+  BLOCKS
+}
+
+enum ExerciseStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String
+  role         Role
+  coachId      String?   @map("coach_id")
+  coach        User?     @relation("CoachStudents", fields: [coachId], references: [id])
+  students     User[]    @relation("CoachStudents")
+  blocked      Boolean   @default(false)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  workouts     Workout[]
+
+  @@index([coachId])
+  @@map("users")
+}
+
+model Workout {
+  id        String     @id @default(uuid())
+  studentId String     @map("student_id")
+  student   User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  startAt   DateTime   @map("start_at")
+  title     String
+  exercises Exercise[]
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@index([studentId, startAt])
+  @@map("workouts")
+}
+
+model Exercise {
+  id            String         @id @default(uuid())
+  workoutId     String         @map("workout_id")
+  workout       Workout        @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  title         String
+  description   String         @default("")
+  sets          Int
+  reps          Int
+  weight        Float
+  weightUnit    WeightUnit     @map("weight_unit")
+  videoUrl      String?        @map("video_url")
+  mediaPath     String?        @map("media_path")
+  status        ExerciseStatus @default(TODO)
+  completedSets Json           @default("[]") @map("completed_sets")
+  sortOrder     Int            @default(0) @map("sort_order")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([workoutId])
+  @@map("exercises")
+}

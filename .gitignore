@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# env (keep *.example tracked)
+backend/.env
+frontend/.env*.local
+
+# builds & caches
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# prisma
+backend/generated/
+
+# runtime
+uploads/
+*.log
+coverage/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
